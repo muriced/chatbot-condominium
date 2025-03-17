@@ -24,7 +24,13 @@ class FAISSManager:
         """Cria um novo índice ou carrega um existente."""
         if self.db is not None and not force_reload:
             return self.db
-            
+        
+        # Se force_reload é True ou o índice não existe, remover diretório do índice
+        if force_reload and self.index_path.exists():
+            import shutil
+            print("Removendo índice FAISS existente...")
+            shutil.rmtree(self.index_path)
+        
         if self.index_path.exists() and not force_reload:
             print("Carregando índice FAISS existente...")
             try:

@@ -31,6 +31,7 @@ class TelegramBot:
         self.application.add_handler(CommandHandler("start", self.start_command))
         self.application.add_handler(CommandHandler("help", self.help_command))
         self.application.add_handler(CommandHandler("reload", self._reload_command))
+        self.application.add_handler(CommandHandler("clear", self.clear_command))
         
         # Mensagens de texto (perguntas)
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.message_handler))
@@ -40,23 +41,29 @@ class TelegramBot:
     
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Envia uma mensagem quando o comando /start é emitido."""
+        # Limpar histórico de conversa existente
+        self.chatbot_utils.conversation_manager.clear_conversation(update.effective_chat.id)
+        
         await update.message.reply_text(
             "👋 Olá! Eu sou o assistente virtual do seu condomínio.\n\n"
             "Você pode me fazer perguntas sobre o Regimento Interno ou "
             "sobre a Convenção Condominial.\n\n"
-            "Use /help para ver todos os comandos disponíveis."
+            "Use /help para ver todos os comandos disponíveis.\n\n"
+            "💬 Nova conversa iniciada! Posso manter o contexto do nosso diálogo."
         )
     
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Envia uma mensagem quando o comando /help é emitido."""
         await update.message.reply_text(
             "📚 Comandos disponíveis:\n\n"
-            "/start - Inicia o bot\n"
+            "/start - Inicia uma nova conversa\n"
             "/help - Mostra esta mensagem de ajuda\n"
-            "/reload - Recarrega a base de conhecimento\n\n"
+            "/reload - Recarrega a base de conhecimento\n"
+            "/clear - Limpa o histórico da conversa atual\n\n"
             "🔍 Como usar:\n"
             "1. Faça perguntas sobre o seu condomínio\n"
-            "2. Receba respostas baseadas nos documentos do condomínio"
+            "2. Receba respostas baseadas nos documentos\n"
+            "3. Continue o diálogo - eu mantenho o contexto da conversa!"
         )
     
     async def _reload_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -66,27 +73,41 @@ class TelegramBot:
         # Recriar o índice
         try:
             self.faiss_manager.create_or_load_index(force_reload=True)
-            await update.message.reply_text("✅ Base de dados recarregada com sucesso!")
+            # Limpar histórico de conversa ao recarregar a base
+            self.chatbot_utils.conversation_manager.clear_conversation(update.effective_chat.id)
+            await update.message.reply_text(
+                "✅ Base de dados recarregada com sucesso!\n"
+                "💬 Histórico da conversa foi limpo para começar uma nova interação."
+            )
         except Exception as e:
             await update.message.reply_text(f"❌ Erro ao recarregar a base de dados: {e}")
+    
+    async def clear_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Limpa o histórico da conversa atual."""
+        self.chatbot_utils.conversation_manager.clear_conversation(update.effective_chat.id)
+        await update.message.reply_text(
+            "🗑 Histórico da conversa limpo!\n"
+            "Você pode começar uma nova conversa agora."
+        )
     
 
     
     async def message_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Responde a mensagens de texto (perguntas)."""
         query = update.message.text
+        chat_id = update.effective_chat.id
         
         # Mostrar que o bot está digitando
         await context.bot.send_chat_action(
-            chat_id=update.effective_chat.id, 
+            chat_id=chat_id, 
             action="typing"
         )
         
         # Buscar documentos relevantes
         docs = self.faiss_manager.similarity_search(query)
         
-        # Gerar resposta
-        response = self.chatbot_utils.generate_response(query, docs)
+        # Gerar resposta considerando o histórico
+        response = self.chatbot_utils.generate_response(query, docs, chat_id)
         
         # Enviar resposta
         await update.message.reply_text(response)
