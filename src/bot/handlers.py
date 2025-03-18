@@ -32,6 +32,7 @@ class TelegramBot:
         self.application.add_handler(CommandHandler("help", self.help_command))
         self.application.add_handler(CommandHandler("reload", self._reload_command))
         self.application.add_handler(CommandHandler("clear", self.clear_command))
+        self.application.add_handler(CommandHandler("stopApplication", self.stop_command))
         
         # Mensagens de texto (perguntas)
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.message_handler))
@@ -59,7 +60,7 @@ class TelegramBot:
             "/start - Inicia uma nova conversa\n"
             "/help - Mostra esta mensagem de ajuda\n"
             "/reload - Recarrega a base de conhecimento\n"
-            "/clear - Limpa o histórico da conversa atual\n\n"
+            "/clear - Limpa o histórico da conversa atual\n"
             "🔍 Como usar:\n"
             "1. Faça perguntas sobre o seu condomínio\n"
             "2. Receba respostas baseadas nos documentos\n"
@@ -90,7 +91,12 @@ class TelegramBot:
             "Você pode começar uma nova conversa agora."
         )
     
-
+    async def stop_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Para o bot."""
+        await update.message.reply_text("🛑 Parando o bot...")
+        await self.application.stop()
+        # await self.application.shutdown()
+    
     
     async def message_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Responde a mensagens de texto (perguntas)."""
